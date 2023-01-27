@@ -5,143 +5,121 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
 
-#ifndef MAX_NICK_SIZE
-#define MAX_NICK_SIZE 32
-#endif
+#include "serv_structs.h"
+#include "serv.h"
+#include "prot.h"
 
-#ifndef REQ_QLEN
-#define REQ_QLEN 32
-#endif
-
-#ifndef INIT_CLIENTS_ARR_SIZE
-#define INIT_SESS_ARR_SIZE 32
-#endif
-
-#ifndef MAX_CLIENT_COUNT
-#define MAX_CLIENT_COUNT 10
-#endif
-
-#ifndef MIN_CLIENT_COUNT
-#define MIN_CLIENT_COUNT 2
-#endif
-
-#ifndef MAX_BUFFER_SIZE 512
-
-//Множество состояний fsm хоста-сервера
-enum fsm_states {
-    fsm_start_prog, //Запуск программы
-    fsm_wait_client, //Ожидание подключения клиентов
-    fsm_start_game, //Начало игры
-    fsm_wait_word_hint, //Ожидание ввода слова и подсказки от хоста-сервера 
-    fsm_select_client_move, //Выбор хода следующего игрока
-    fsm_wait_client_move_result, //Ожидание результатов хода 
-    fsm_handle_client_inf, //Обработка информации от клиента
-    fsm_guess_letter, //Угадана буква
-    fsm_guess_word, //Угадано слово 
-    fsm_guess_nothing, //Ничего не угадано
-    fsm_client_win, //Победа игрока
-    fsm_wait_new_game, //Ожидание начала новой игры
-    fsm_disconnect_other_player_move, //Отключение клиента в чужой ход 
-    fsm_end_prog, //Завершение программы
-    fsm_error //Ошибка выполнения программы
-};
-
-struct sess_client {
-    int sd; //Сокет для связи с клиентом
-    char nick[MAX_NICK_SIZE]; //Никнэйм игрока
-    enum fsm_states state; //Состояние fsm каждого клиента
-};
-
-struct sess_serv {
-    int ls, //Прослушивающий сокет
-    struct sess_client **clients; //Динамический массив структур данных о клиентах
-    int clients_arr_size; //Длина динамического массива
-};
+/*
+ * Проверка наличия минимального числа игроков и потверждения хостом
+ * начала игры 
+ */
 
 //Описание шагов fsm  
-void server_fms_step(struct session_serv *serv) {
-    switch (serv->state) {
+void server_fsm_step(struct sess_serv *serv, int sd) {
+    switch (serv->clients[sd]->state) {
         case fsm_wait_client:
-            server_check_start_game(serv);
-            serv->state = fsm_start_game;
+            server_check_start_game(serv, sd);
             break;
         case fsm_start_game:
-            server_start_game(serv);
-            serv->state = fsm_wait_word_hint;
+            server_start_game(serv, sd);
             break;
         case fsm_wait_word_hint:
-            server_get_word();  
-            server_get_hint();
-            serv->state = fsm_select_client_move;
+            server_get_host_word(serv);  
+            server_get_host_hint(serv);
             break;
         case fsm_select_client_move:
-            server_select_next_move(serv);
-            server_send_notif(serv);
-            serv->state = fsm_wait_client_move_result;
+            server_select_next_move(serv, sd);
+            server_send_notif(serv, sd);
             break;
         case fsm_wait_client_move_result:
-            server_check_valid_inf(serv);
-            serv->state = fsm_handle_client_inf;
+            server_check_valid_inf(serv, sd);
             break;
         case fsm_handle_client_inf:
-            server_handle_client_inf(serv);
+            server_handle_client_inf(serv, sd);
             break;
         case fsm_guess_word:
-            server_send_msg(serv);
-            serv->state = fsm_client_win;
+            server_send_msg_res(serv, sd);
             break;
         case fsm_guess_letter:
-            serv_check_for_word(serv);
+            server_check_for_word(serv, sd);
             break;
         case fsm_guess_nothing:
-            server_send_msg_res(serv);
-            serv->state = fsm_select_client_move;
+            server_send_msg_res(serv, sd);
             break;
         case fsm_client_win:
-            server_send_win_req_msg(serv);
-            serv->state = fsm_wait_new_game;
+            server_send_win_req_msg(serv, sd);
             break;
         case fsm_wait_new_game:
-            server_check_valid_inf(serv);
-            server_get_ngame_reply(serv);
-            server_handle_ngame_reply(serv);
+            server_check_valid_inf(serv, sd);
+            server_get_ngame_reply(serv, sd);
+            server_handle_ngame_reply(serv, sd);
             break;
         case fsm_disconnect_other_player_move:
+            server_handle_client_disconnect(serv, sd);
             break;
         case fsm_end_prog:
             break;
     }
 }
 
-int server_read_from_client(struct sess_client *client)
-{
-    size_t size;
-    from_client[MAX_BUFFER_SIZE];
+//sd - дескриптор обрабатываемого клиента
+void server_read_from_client(struct sess_serv *serv, int sd) {
 
-    size = read(sess->sd, from_client, sizeof(MAX_BUFFER_SIZE));
-    if(size <= 0) {
+    size_t size;
+    char from_client[MAX_BUFFER_SIZE];
+
+    size = read(serv->clients[sd]->sd, from_client, sizeof(from_client));
+    if (size <= 0) {
         perror("read");
         exit(1);
     }
-
-    if (sess->state == fsm_finish)
-        return 0;
-    return 1;
+    
+    /*
+     * Протокол: преобразование информации от клиента 
+     * дешифровка команды (возможны опции и параметры), 
+     * заполнение структуры сервера и клиента
+     */
+    prot_get_from_cmd(serv, sd, size);
 }
 
-struct sess_client *make_new_sess_client(int fd) {
+//sd - дескриптор обрабатываемого клиента
+void server_write_to_client(struct sess_serv *serv, int sd) {
+    
+    size_t size;
+    char to_client[MAX_BUFFER_SIZE];
 
-    struct sess_client *client = malloc(sizeof(*sess));
+    /*
+     * Протокол: формирование ответа клиенту 
+     * взятие данных из структур сервера и клиента
+     * создание команды (возможны опции и параметры), 
+     */
+    strcpy(to_client, prot_put_into_cmd(serv, 
+    sd, MAX_BUFFER_SIZE));
+
+    size = write(serv->clients[sd]->sd, 
+    to_client, sizeof(to_client));
+    if (size != sizeof(to_client)) {
+        perror("write");
+        exit(1);
+    }
+}
+
+struct sess_client *make_new_sess_client(int sd) {
+
+    struct sess_client *client = malloc(sizeof(struct sess_client));
 
     client->sd = sd;
-    client->nick = NULL;
-    client->state = fsm_start_prog;
+    memset(client->nick, 0, sizeof(client->nick));
+    memset(client->word, 0, sizeof(client->word));
+    client->letter = 0;
+    client->state = fsm_wait_client;
 
     return client;
 }
 
-void server_accept_client(struct server_str *serv)
+void server_accept_client(struct sess_serv *serv)
 {
     int sd, i;
     struct sockaddr_in cliaddr;
@@ -179,14 +157,15 @@ void server_accept_client(struct server_str *serv)
 void server_init(struct sess_serv *serv, int serv_port) {
 
     struct sockaddr_in servaddr;
+    int i;
     
-    serv->ls = socket(AF_INNET, SOCK_STREAM, IPPROTO_TCP);
+    serv->ls = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serv->ls < 0) {
         perror("socket");
         exit(1);
     }
     
-    servaddr.sin_family = AF_INNET;
+    servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(serv_port);
 
@@ -215,18 +194,18 @@ void server_go(struct sess_serv *serv) {
     fd_set readfds;
     int maxfd;
     int end_client_sess;
-    int client_count;
+    int i, client_count;
 
+    client_count = 0;
     for(;;) { 
         
         FD_ZERO(&readfds);
 
-        
         FD_SET(serv->ls, &readfds);
         maxfd = serv->ls;
 
         for (i = 0; i < serv->clients_arr_size; i++) {
-            //Проверка на NULL(NULL если клиент ещене подключился)
+            //Проверка на NULL(NULL, если клиент еще не подключился)
             if(serv->clients[i]) {
                 FD_SET(i, &readfds);
                 if(i > maxfd)
@@ -240,109 +219,27 @@ void server_go(struct sess_serv *serv) {
         }
         
         /*
-         * Событие: запрос нового клиента на соединение, если клиентов большеем
+         * Событие: запрос нового клиента на соединение, если клиентов больше
+         * чем максимальное возможное число, то запускаем отказ
          */
-        if (FD_ISSET(serv->ls, &readfds) && (client_count < MAX_CLIENT_COUNT))
+        if (FD_ISSET(serv->ls, &readfds) && (client_count < MAX_CLIENT_COUNT)) {
+            client_count++;
             server_accept_client(serv);
+        }
+        else {
+            //Отказ новому клиенту
+        }
 
         /*
          * События: получение информации от пользователя(любой)
          */
-        for(i = 0; i < serv->clients_arr_size; i++) {
-            if(serv->clients[i] && FD_ISSET(i, &readfds)) {
-                 server_read_from_client(serv->clients[i]);
-                if(!end_client_sess)
-                    server_close_sess_client(serv, i);
+        for (i = 0; i < serv->clients_arr_size; i++) {
+            if (serv->clients[i] && FD_ISSET(i, &readfds)) {
+                server_read_from_client(serv, i);
             }
         }
     }
      
-}
-
-/*
- * Проверка наличия игроков и потверждение хостом
- * начала игры 
- */
-int server_check_start_game(struct session_serv *serv) {
-        
-}
-
-//Запуск игры
-int server_start_game(struct session_serv *serv) {
-
-}
-
-//Ввод слова 
-int server_get_word(struct session_serv *serv) {
-
-}
-
-//Ввод подсказки
-int server_get_hint(struct session_serv *serv) {
-    
-}
-
-//Выбор хода следующего игрока
-int server_select_next_move(struct session_serv *serv) {
-
-}
-
-//Отправка клиенту уведомления о начала его хода
-int server_send_notif(struct session_serv *serv) {
-
-}
-
-/*
- * Проверка информации на коррекстность
- *(проверка данных на соответствие клиента 
- * и клиента текущего хода)
- */
-int server_check_valid_inf(struct session_serv *serv) {
-    
-}
-
-/*
- * Обработка пришедшей информации от клиента,
- * у которого сейчас ход 
- */
-int server_handle_client_inf(struct session_serv *serv) {
-    
-}
-
-//Отправка сообщения о результатах хода
-int server_send_msg_res(struct session_serv *serv) {
-
-}
-
-//Проверка на получение последней буквы в слове 
-int server_check_for_word(struct session_serv *serv) {
-       
-}
-
-/*
- * Отправка сообщения о победе игрока 
- * и предложение начать новую игру
- */
-int server_send_win_req_msg(struct session_serv *serv) {
-        
-}
-
-/*
- * Ввод ответа от клиента о начале новой игры
- * и обработка ответа
- */
-int server_get_ngame_reply(struct session_serv *serv) {
-
-}
-
-//Обработка ответа от клиента о начале новой игры
-и обработка ответа
-int server_handle_ngame_reply(struct session_serv *serv) {
-
-}
-
-int server_handle_client_disconnect(struct session_serv *serv) {
-    
 }
 
 //MAIN
@@ -357,7 +254,7 @@ int main(int argc, char *argv[]) {
     }
 
     server_init(&server, port);
-    server_go(server);
+    server_go(&server);
     
     return 0;
 }
