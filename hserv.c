@@ -10,11 +10,8 @@
 #include "serv_structs.h"
 #include "serv.h"
 #include "prot.h"
-
-/*
- * Проверка наличия минимального числа игроков и потверждения хостом
- * начала игры 
- */
+#include "consts.h"
+#include "states.h"
 
 //Описание шагов fsm  
 void server_fsm_step(struct sess_serv *serv, int sd) {

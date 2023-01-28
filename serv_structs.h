@@ -1,3 +1,9 @@
+#ifndef SERV_STRUCTS_H
+#define SERV_STRUCTS_H
+
+#include "consts.h"
+#include "states.h"
+
 struct game_conf {
     int move_time;
     //Что-то еще)
@@ -23,3 +29,5 @@ struct sess_serv {
     //позиции от всех игроков
     struct game_conf *conf; //Указатель на структуру конфигурации игры
 };
+
+#endif /*SERV_STRUCTS*/

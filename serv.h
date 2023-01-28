@@ -1,56 +1,7 @@
-#ifndef MAX_NICK_SIZE
-#define MAX_NICK_SIZE 16
-#endif
+#ifndef SERV_H
+#define SERV_H
 
-#ifndef MAX_WORD_SIZE
-#define MAX_WORD_SIZE 16
-#endif
-
-#ifndef MAX_HINT_SIZE
-#define MAX_HINT_SIZE 64
-#endif
-
-#ifndef REQ_QLEN
-#define REQ_QLEN 10
-#endif
-
-#ifndef INIT_CLIENTS_ARR_SIZE
-#define INIT_CLIENTS_ARR_SIZE 32
-#endif
-
-#ifndef MAX_CLIENT_COUNT
-#define MAX_CLIENT_COUNT 10
-#endif
-
-#ifndef MIN_CLIENT_COUNT
-#define MIN_CLIENT_COUNT 2
-#endif
-
-#ifndef MAX_BUFFER_SIZE
-#define MAX_BUFFER_SIZE 512
-#endif
-
-#ifndef MAX_CMD_SIZE 
-#define MAX_CMD_SIZE 32
-#endif
-
-//Множество состояний fsm хоста-сервера
-enum fsm_states {
-    fsm_wait_client, //Ожидание подключения клиентов
-    fsm_start_game, //Начало игры
-    fsm_wait_word_hint, //Ожидание ввода слова и подсказки от хоста-сервера 
-    fsm_select_client_move, //Выбор хода следующего игрока
-    fsm_wait_client_move_result, //Ожидание результатов хода 
-    fsm_handle_client_inf, //Обработка информации от клиента
-    fsm_guess_letter, //Угадана буква
-    fsm_guess_word, //Угадано слово 
-    fsm_guess_nothing, //Ничего не угадано
-    fsm_client_win, //Победа игрока
-    fsm_wait_new_game, //Ожидание начала новой игры
-    fsm_disconnect_other_player_move, //Отключение клиента в чужой ход 
-    fsm_end_prog, //Завершение программы
-    fsm_error //Ошибка выполнения программы
-};
+#include "serv_structs.h"
 
 //Проверка на запуск игры
 void server_check_start_game(struct sess_serv *serv, int sd);
@@ -109,3 +60,5 @@ void server_handle_ngame_reply(struct sess_serv *serv, int sd);
 
 //Обработка отключения игрока
 void server_handle_client_disconnect(struct sess_serv *serv, int sd);
+
+#endif /*SERV_H*/

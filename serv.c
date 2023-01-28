@@ -1,4 +1,5 @@
-#include "serv.h"
+#include "serv_structs.h"
+#include "states.h"
 
 void server_check_start_game(struct sess_serv *serv, int sd) {
 
