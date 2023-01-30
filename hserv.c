@@ -62,26 +62,6 @@ void server_fsm_step(struct sess_serv *serv, int sd) {
 }
 
 //sd - дескриптор обрабатываемого клиента
-void server_read_from_client(struct sess_serv *serv, int sd) {
-
-    size_t size;
-    char from_client[MAX_BUFFER_SIZE];
-
-    size = read(serv->clients[sd]->sd, from_client, sizeof(from_client));
-    if (size <= 0) {
-        perror("read");
-        exit(1);
-    }
-    
-    /*
-     * Протокол: преобразование информации от клиента 
-     * дешифровка команды (возможны опции и параметры), 
-     * заполнение структуры сервера и клиента
-     */
-    prot_get_from_cmd(serv, sd, size);
-}
-
-//sd - дескриптор обрабатываемого клиента
 void server_write_to_client(struct sess_serv *serv, int sd) {
     
     size_t size;
@@ -92,15 +72,39 @@ void server_write_to_client(struct sess_serv *serv, int sd) {
      * взятие данных из структур сервера и клиента
      * создание команды (возможны опции и параметры), 
      */
-    strcpy(to_client, prot_put_into_cmd(serv, 
-    sd, MAX_BUFFER_SIZE));
+    /*strcpy(to_client, prot_put_into_cmd(serv, 
+    sd, MAX_BUFFER_SIZE));*/
+	sprintf(to_client, "<Server>: Hello, User #%d", sd);
 
-    size = write(serv->clients[sd]->sd, 
-    to_client, sizeof(to_client));
+    size = write(sd, to_client, 
+	sizeof(to_client));
     if (size != sizeof(to_client)) {
         perror("write");
         exit(1);
     }
+}
+
+//sd - дескриптор обрабатываемого клиента
+void server_read_from_client(struct sess_serv *serv, int sd) {
+
+    size_t size;
+    char from_client[MAX_BUFFER_SIZE];
+
+    size = read(sd, from_client, sizeof(from_client));
+    if (size <= 0) {
+        perror("read");
+        exit(1);
+    }
+    
+    /*
+     * Протокол: преобразование информации от клиента 
+     * дешифровка команды (возможны опции и параметры), 
+     * заполнение структуры сервера и клиента
+     */
+    //prot_get_from_cmd(serv, sd, size);
+	printf("Recieved from client --> %s", from_client);
+
+	server_write_to_client(serv, sd);
 }
 
 struct sess_client *make_new_sess_client(int sd) {
@@ -249,6 +253,7 @@ int main(int argc, char *argv[]) {
         printf("Usage: hserv <port>\n");
         exit(1);
     }
+	port = atoi(argv[1]);
 
     server_init(&server, port);
     server_go(&server);
