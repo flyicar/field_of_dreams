@@ -7,6 +7,9 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 #include "serv_structs.h"
 #include "serv.h"
@@ -121,16 +124,6 @@ void server_go(struct sess_serv *serv) {
 	char command[512];
 	size_t size;
 
-	printf("Enter any command:\n");
-	fgets(command, sizeof(command), stdin);
-
-    size = write(serv->fd[1], command, 
-	sizeof(command));
-    if (size != sizeof(command)) {
-        perror("write");
-        exit(1);
-    }
-
     for(;;) { 
         
         FD_ZERO(&readfds);
@@ -184,15 +177,9 @@ void server_go(struct sess_serv *serv) {
                 server_read_from_stream(serv, i);
             }
         }
-
-		size = read(serv->fd[0], command, sizeof(command));
-		if (size < 0) {
-			perror("read");
-			exit(1);
-    	}
-		printf("%s", command);
-		fflush(stdout);
     }
+
+	close(serv->fd[0]);
 }
 
 //Инициализация сервера
@@ -232,17 +219,36 @@ void server_init(struct sess_serv *serv, int serv_port) {
         serv->clients[i] = NULL;
 	
 	serv->msg = malloc(sizeof(struct prot_struct));
+
+	unlink("a.fifo");
+	umask(0000);
 	
 	//Инициализация pipe для хоста
-	if (pipe(serv->fd) < 0) {
+	if (mkfifo("a.fifo", 0666) < 0) {
+		perror("mkfifo");
+		exit(1);
+	}
+
+    serv->fd[0] = open("a.fifo", O_RDWR);
+    if (serv->fd[0] == -1) {
+		perror("open");
+        exit(-1);
+    }	
+
+	/*if (pipe(serv->fd) < 0) {
 		perror("pipe");
 		exit(1);
+	}*/
+
+	//Инициализация очереди клиентов
+	for (i = 0; i < MAX_CLIENT_COUNT; i++) {
+		serv->players_queue[i] = -1;
 	}
 
 	//Инициализация базовых переменных сервера
 	serv->client_count = 0;
+	serv->player_count = 0;
 	serv->host_start_game = 0;
-
 }
 
 //MAIN

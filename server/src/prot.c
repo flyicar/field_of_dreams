@@ -13,10 +13,9 @@ void prot_string_pars(struct prot_struct *msg, char buffer[MAX_BUFFER_SIZE]) {
     istr = strtok(NULL, "/");
 	strcpy(msg->device_type, istr);
 
-	if (!istr) {
-		istr = strtok(NULL, "/");
+	istr = strtok(NULL, "/");
+	if (istr) 
 		strcpy(msg->data, istr);
-	}
 }
 
 void prot_make_command(struct prot_struct *msg, char buffer[MAX_BUFFER_SIZE]) {
@@ -32,6 +31,9 @@ void prot_make_command(struct prot_struct *msg, char buffer[MAX_BUFFER_SIZE]) {
 void prot_fill_prot_msg(struct prot_struct *msg, char *cmd, 
 char *dev_type, char *data) {
 	
+	memset(msg->command, 0, sizeof(msg->command));
+	memset(msg->device_type, 0, sizeof(msg->device_type));
+	memset(msg->data, 0, sizeof(msg->data));
 	strcpy(msg->command, cmd);
 	strcpy(msg->device_type, dev_type);
 
@@ -46,11 +48,13 @@ enum commands prot_get_packet_type(char* str) {
     if (strcmp(str, "START") == 0) return START;
     if (strcmp(str, "USERS") == 0) return USERS; 
     if (strcmp(str, "WORD") == 0) return WORD;
+    if (strcmp(str, "HINT") == 0) return HINT;
     if (strcmp(str, "DATA") == 0) return DATA;
     if (strcmp(str, "MOVE") == 0) return MOVE;
     if (strcmp(str, "SUCCESS") == 0) return SUCCESS;
     if (strcmp(str, "INCORRECT") == 0) return INCORRECT;
     if (strcmp(str, "TIMEOUT") == 0) return TIMEOUT;
     if (strcmp(str, "ENDGAME") == 0) return ENDGAME;
-    if (strcmp(str, "ERROR") == 0) return ERROR;
+
+	return ERROR;
 }

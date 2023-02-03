@@ -30,6 +30,8 @@ struct sess_serv {
     char word[MAX_WORD_SIZE]; //Загаданное хостом слово
     char hint[MAX_HINT_SIZE]; //Данная хостом подсказка
 	int client_count; //Текущее число клиентов подключенных к серверу
+	int player_count; //Число играющих игроков
+	int players_queue[MAX_CLIENT_COUNT];
     int pos_arr_serv[MAX_WORD_SIZE]; //Булевый массив, содержащий угаданные 
     //позиции от всех игроков
 	int fd[2]; //Дескрипторы пайпа для связи с хостом

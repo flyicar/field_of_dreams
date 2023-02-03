@@ -29,14 +29,15 @@ void server_read_from_stream(struct sess_serv *serv, int sd) {
 	}
 }
 
-//Рассылка сообщения всем клиентам, в том числе хосту
+//Рассылка сообщения всем игрокам, и хосту если необходимо 
 void server_broadcast(struct sess_serv *serv, int host) {
 	
 	int i;
 	
-	for (i = 0; i < serv->clients_arr_size; i++)
-		if (serv->clients[i])
-			server_write_to_stream(serv, i);	
+	for (i = 0; i < serv->player_count; i++)
+		if (serv->clients[serv->players_queue[i]]->state >= fsm_start_game)
+			server_write_to_stream(serv, serv->players_queue[i]);	
+
 	if (host)
 		server_write_to_stream(serv, serv->fd[1]);
 }

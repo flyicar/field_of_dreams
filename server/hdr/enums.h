@@ -1,6 +1,7 @@
 #ifndef ENUMS_H
 #define ENUMS_H
 
+/*
 //Множество состояний fsm хоста-сервера
 enum fsm_states {
 	fsm_start_prog, //Запуск программы
@@ -19,10 +20,19 @@ enum fsm_states {
     fsm_end_prog, //Завершение программы
     fsm_error //Ошибка выполнения программы
 };
+*/
+
+enum fsm_states {
+	fsm_start_prog,
+	fsm_wait_new_game,
+	fsm_wait_start_game,
+	fsm_start_game,
+};
 
 enum commands {
-	DENIED, //Отказ сервера
+	DENIED, //Отказ сервера клиенту или хосту
 	HELLO, //Отправка подтверждения на начало игры
+		   //Или получение запроса на начало игры
 	START, //Отправка информирования о начале игры
 	USERS, //Отправка данных об игроках
 	WORD, //Отправка слова 

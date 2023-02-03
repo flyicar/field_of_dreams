@@ -20,4 +20,8 @@ void server_init(struct sess_serv *serv, int serv_port);
 
 void server_go(struct sess_serv *serv);
 
+void server_form_nick_str(struct sess_serv *serv, char str[MAX_CLIENT_COUNT * MAX_NICK_SIZE + MAX_CLIENT_COUNT]);
+
+void server_put_in_queue(struct sess_serv *serv, int sd);
+
 #endif /*SERV_H*/
